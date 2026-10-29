@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Consultorio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <p class="marca">Consultorio</p>
+      <h1>Recordatorios</h1>
+      <p id="meta" class="meta"></p>
+      <p id="error" class="error" hidden></p>
+
+      <div class="acciones">
+        <button id="procesar" class="primaria" type="button">Procesar pendientes</button>
+        <button id="sincronizar" class="secundaria" type="button">Sincronizar</button>
+      </div>
+
+      <form id="demo" class="demo">
+        <label for="hora">Hora de la demo</label>
+        <div class="demo-fila">
+          <input id="hora" type="datetime-local" />
+          <button id="hora-real" class="secundaria" type="button">Usar la hora real</button>
+        </div>
+        <div class="demo-fila">
+          <button id="hoy-16" class="secundaria" type="button">Poner hoy a las 16:00</button>
+          <button id="manana-0730" class="secundaria" type="button">Poner mañana a las 07:30</button>
+        </div>
+      </form>
+
+      <p id="resultado" class="resultado" aria-live="polite"></p>
+      <p id="mock" class="meta"></p>
+
+      <section id="lista" class="lista" aria-label="Recordatorios"></section>
+    </main>
+    <script type="module" src="/app.js"></script>
+    <noscript>Esta pantalla necesita JavaScript.</noscript>
+  </body>
+</html>
