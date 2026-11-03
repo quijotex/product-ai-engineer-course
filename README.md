@@ -12,6 +12,16 @@ node server.js
 
 Abrir http://127.0.0.1:3000.
 
+## Despliegue en Netlify
+
+La app también corre completa en el navegador, sin servidor: si la pantalla no encuentra `/api/`, usa el mismo núcleo (`src/consultorio.js`) dentro de la pestaña. El estado vive en la pestaña y se reinicia al recargar.
+
+`netlify.toml` ya trae la configuración: build `node scripts/build.js` y publicación de `dist/`. En la pantalla de Netlify se dejan vacíos los campos de build. Para probar el build en local:
+
+```bash
+npm run build
+```
+
 ## Pantallas
 
 - **Recordatorios.** Un tiquete por recordatorio, con un sello de confirmación y filtros. Si alguien canceló, aparece un aviso para liberar el espacio en Google Calendar.
@@ -36,7 +46,8 @@ Las pruebas están en `node --test`.
 - `docs/spec-confirmacion-asistencia.md` — spec de la confirmación de asistencia, con criterios de aceptación y métricas de éxito.
 - `.cursor/skills/diseno-de-marca/SKILL.md` — marca visual y tono: porcelana, tinta y terracota, botón tecla y tiquetes.
 - `server.js` — arranca la app.
-- `src/` — reglas de envío y de respuestas, adaptadores de Calendar y WhatsApp, y el servidor.
+- `src/` — reglas de envío y de respuestas, adaptadores de Calendar y WhatsApp, el núcleo de la app (`consultorio.js`) y el servidor.
+- `scripts/build.js` y `netlify.toml` — arman `dist/` para el despliegue estático.
 - `public/` — las tres pantallas.
 - `test/` — los criterios de aceptación.
 - `.env.example` — interruptor de mock o real. Para este ejercicio se queda en mock.

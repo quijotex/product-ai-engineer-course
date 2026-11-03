@@ -2,35 +2,19 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { crearCalendario, crearWhatsapp } from './adapters.js';
 import { leerConfig } from './config.js';
-import {
-  aplicarRespuestas,
-  confirmacionDe,
-  conversaciones,
-  dentroDeVentana,
-  desdeBogota,
-  liberarEspacio,
-  partesBogota,
-  presentar,
-  procesar,
-  responder,
-  resumen,
-  sincronizar,
-  textoFecha,
-  textoReloj,
-  textoRespuesta,
-  textoResultado,
-  valorDatetime,
-  visibles,
-} from './domain.js';
+import { crearConsultorio } from './consultorio.js';
 
-const PUBLICO = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
+const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+// La pantalla importa el núcleo desde /lib/. En Netlify, scripts/build.js copia los mismos archivos.
 const ARCHIVOS = {
-  '/': 'index.html',
-  '/index.html': 'index.html',
-  '/styles.css': 'styles.css',
-  '/app.js': 'app.js',
+  '/': 'public/index.html',
+  '/index.html': 'public/index.html',
+  '/styles.css': 'public/styles.css',
+  '/app.js': 'public/app.js',
+  '/lib/consultorio.js': 'src/consultorio.js',
+  '/lib/domain.js': 'src/domain.js',
+  '/lib/adapters.js': 'src/adapters.js',
 };
 const TIPOS = {
   '.html': 'text/html; charset=utf-8',
@@ -39,161 +23,18 @@ const TIPOS = {
 };
 
 export function createApp(opciones = {}) {
-  const config = opciones.config ?? leerConfig();
-  const ahoraReal = opciones.ahoraReal ?? (() => new Date());
-  const fetchImpl = opciones.fetchImpl ?? globalThis.fetch;
-  const calendario = opciones.calendario ?? crearCalendario({
-    mode: config.calendarPedido,
-    calendarId: config.calendarId,
-    token: config.calendarToken,
-    fetchImpl,
-    ahoraReal,
+  const consultorio = crearConsultorio({
+    ...opciones,
+    config: opciones.config ?? leerConfig(),
   });
-  const whatsapp = opciones.whatsapp ?? crearWhatsapp({
-    mode: config.whatsappPedido,
-    token: config.whatsappToken,
-    phoneNumberId: config.whatsappPhoneNumberId,
-    fetchImpl,
-  });
-
-  let recordatorios = [];
-  let respuestas = {};
-  let horaDemo = null;
-  let errorCalendario = null;
-  // En real no hay webhook para leer respuestas: no se piden ni se muestran.
-  const leeRespuestas = whatsapp.modo === 'mock';
-
-  function ahora() {
-    return horaDemo ?? ahoraReal();
-  }
-
-  async function sincronizarAhora() {
-    try {
-      const citas = await calendario.leer();
-      errorCalendario = null;
-      recordatorios = aplicarRespuestas(
-        sincronizar(citas, recordatorios, { pedirRespuesta: leeRespuestas }),
-        respuestas,
-      );
-    } catch {
-      errorCalendario = 'No se pudo leer el calendario.';
-    }
-  }
-
-  async function aplicarProceso() {
-    const resultado = await procesar(
-      recordatorios,
-      ahora(),
-      (mensaje) => whatsapp.enviar(mensaje),
-    );
-    recordatorios = resultado.recordatorios;
-    return resultado;
-  }
-
-  let cola = Promise.resolve();
-  function encolar(trabajo) {
-    const ejecucion = cola.then(trabajo, trabajo);
-    cola = ejecucion.then(() => {}, () => {});
-    return ejecucion;
-  }
-
-  const arranque = encolar(async () => {
-    await sincronizarAhora();
-    if (whatsapp.modo === 'real') await aplicarProceso();
-  });
-
-  function responderAhora(cuerpo) {
-    if (!leeRespuestas) {
-      return { error: 'Las respuestas simuladas solo están disponibles con WhatsApp en mock.' };
-    }
-    if (typeof cuerpo?.eventoId !== 'string' || typeof cuerpo?.texto !== 'string') {
-      return { error: 'Falta la cita o la respuesta.' };
-    }
-    const salida = responder(recordatorios, respuestas, cuerpo, ahora());
-    if (salida.error) return salida;
-    recordatorios = salida.recordatorios;
-    respuestas = salida.respuestas;
-    return { aviso: textoRespuesta(salida) };
-  }
-
-  function liberarAhora(cuerpo) {
-    if (typeof cuerpo?.eventoId !== 'string') return { error: 'Falta la cita.' };
-    const salida = liberarEspacio(respuestas, cuerpo.eventoId);
-    if (salida.error) return salida;
-    respuestas = salida.respuestas;
-    return {};
-  }
-
-  function cuerpoEstado(resultado, avisoSimulador = null) {
-    const momento = ahora();
-    const lista = visibles(recordatorios, momento).map((fila) => presentar(
-      fila,
-      momento,
-      leeRespuestas
-        ? {
-          confirmacion: confirmacionDe(fila.eventoId, recordatorios, respuestas),
-          respuesta: respuestas[fila.eventoId] ?? null,
-        }
-        : {},
-    ));
-    return {
-      leeRespuestas,
-      conversaciones: leeRespuestas ? conversaciones(recordatorios, respuestas, momento) : [],
-      resumen: resumen(recordatorios, respuestas),
-      avisoSimulador,
-      zona: 'America/Bogota',
-      ahora: momento.toISOString(),
-      ahoraCampo: valorDatetime(momento),
-      hora: textoReloj(momento),
-      fecha: textoFecha(momento),
-      horaDemo: Boolean(horaDemo),
-      calendar: calendario.modo,
-      whatsapp: whatsapp.modo,
-      calendarPedido: calendario.pedido,
-      whatsappPedido: whatsapp.pedido,
-      dentroDeVentana: dentroDeVentana(momento),
-      errorCalendario,
-      entregasMock: whatsapp.modo === 'mock' ? whatsapp.entregas.length : null,
-      recordatorios: lista,
-      resultado: resultado ? textoResultado(resultado) : null,
-    };
-  }
-
-  function fijarHora(cuerpo) {
-    if (whatsapp.modo !== 'mock') {
-      return { error: 'La hora de la demo solo está disponible con WhatsApp en mock.', status: 400 };
-    }
-    if (!cuerpo || cuerpo.hora === null || cuerpo.preset === 'real') {
-      horaDemo = null;
-      return { ok: true };
-    }
-    if (cuerpo.preset === 'hoy-16:00' || cuerpo.preset === 'manana-07:30') {
-      const base = partesBogota(ahoraReal());
-      const dia = cuerpo.preset === 'hoy-16:00' ? base.day : base.day + 1;
-      const hora = cuerpo.preset === 'hoy-16:00' ? 16 : 7;
-      const minuto = cuerpo.preset === 'hoy-16:00' ? 0 : 30;
-      horaDemo = desdeBogota(base.year, base.month, dia, hora, minuto);
-      return { ok: true };
-    }
-    if (typeof cuerpo.hora === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(cuerpo.hora)) {
-      const [fecha, hm] = cuerpo.hora.split('T');
-      const [year, month, day] = fecha.split('-').map(Number);
-      const [hour, minute] = hm.split(':').map(Number);
-      if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) {
-        return { error: 'La hora no es válida.', status: 400 };
-      }
-      horaDemo = desdeBogota(year, month - 1, day, hour, minute);
-      return { ok: true };
-    }
-    return { error: 'La hora no es válida.', status: 400 };
-  }
 
   const server = http.createServer(async (req, res) => {
     try {
-      await arranque;
       const url = new URL(req.url, 'http://127.0.0.1');
       if (url.pathname.startsWith('/api/')) {
-        await rutaApi(req, res, url.pathname);
+        const cuerpo = req.method === 'POST' ? await leerJson(req) : null;
+        const salida = await consultorio.manejar(req.method, url.pathname, cuerpo);
+        enviarJson(res, salida.status, salida.cuerpo);
         return;
       }
       servirEstatico(res, url.pathname);
@@ -202,57 +43,9 @@ export function createApp(opciones = {}) {
     }
   });
 
-  async function rutaApi(req, res, pathname) {
-    if (req.method === 'GET' && pathname === '/api/estado') {
-      enviarJson(res, 200, cuerpoEstado(null));
-      return;
-    }
-    if (req.method === 'POST' && pathname === '/api/sincronizar') {
-      await encolar(sincronizarAhora);
-      enviarJson(res, 200, cuerpoEstado(null));
-      return;
-    }
-    if (req.method === 'POST' && pathname === '/api/procesar') {
-      const resultado = await encolar(aplicarProceso);
-      enviarJson(res, 200, cuerpoEstado(resultado));
-      return;
-    }
-    if (req.method === 'POST' && pathname === '/api/responder') {
-      const cuerpo = await leerJson(req);
-      const salida = await encolar(async () => responderAhora(cuerpo));
-      if (salida.error) {
-        enviarJson(res, 400, { error: salida.error });
-        return;
-      }
-      enviarJson(res, 200, cuerpoEstado(null, salida.aviso));
-      return;
-    }
-    if (req.method === 'POST' && pathname === '/api/espacio') {
-      const cuerpo = await leerJson(req);
-      const salida = await encolar(async () => liberarAhora(cuerpo));
-      if (salida.error) {
-        enviarJson(res, 400, { error: salida.error });
-        return;
-      }
-      enviarJson(res, 200, cuerpoEstado(null));
-      return;
-    }
-    if (req.method === 'POST' && pathname === '/api/hora') {
-      const cuerpo = await leerJson(req);
-      const fijada = fijarHora(cuerpo);
-      if (fijada.error) {
-        enviarJson(res, fijada.status, { error: fijada.error });
-        return;
-      }
-      enviarJson(res, 200, cuerpoEstado(null));
-      return;
-    }
-    enviarJson(res, 404, { error: 'No se encontró.' });
-  }
-
-  if (whatsapp.modo === 'real') {
+  if (consultorio.whatsappModo === 'real') {
     const timer = setInterval(() => {
-      encolar(aplicarProceso).catch(() => {});
+      consultorio.procesarPendientes().catch(() => {});
     }, 60_000);
     timer.unref?.();
     server.on('close', () => clearInterval(timer));
@@ -267,7 +60,7 @@ function servirEstatico(res, pathname) {
     enviarJson(res, 404, { error: 'No se encontró.' });
     return;
   }
-  const archivo = path.join(PUBLICO, nombre);
+  const archivo = path.join(RAIZ, nombre);
   const cuerpo = fs.readFileSync(archivo);
   res.writeHead(200, {
     'Content-Type': TIPOS[path.extname(archivo)],

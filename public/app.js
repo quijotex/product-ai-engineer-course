@@ -127,10 +127,39 @@ async function responder(texto) {
   if (nuevo) textoLibre.value = '';
 }
 
-async function pedir(ruta, opciones) {
-  const respuesta = await fetch(ruta, opciones);
-  const datos = await respuesta.json();
-  if (!respuesta.ok) {
+// Con `node server.js` la pantalla habla con /api/. En un hosting estático (Netlify)
+// no hay /api/, así que corre el mismo núcleo dentro del navegador.
+let backend = null;
+
+function obtenerBackend() {
+  backend ??= (async () => {
+    try {
+      const prueba = await fetch('/api/estado', { cache: 'no-store' });
+      if (prueba.ok && prueba.headers.get('content-type')?.includes('application/json')) {
+        return { remoto: true };
+      }
+    } catch {
+      // Sin servidor: sigue con el núcleo local.
+    }
+    const { crearConsultorio } = await import('./lib/consultorio.js');
+    return { remoto: false, consultorio: crearConsultorio() };
+  })();
+  return backend;
+}
+
+async function pedir(ruta, opciones = {}) {
+  const destino = await obtenerBackend();
+  let status;
+  let datos;
+  if (destino.remoto) {
+    const respuesta = await fetch(ruta, opciones);
+    status = respuesta.status;
+    datos = await respuesta.json();
+  } else {
+    const cuerpo = opciones.body ? JSON.parse(opciones.body) : null;
+    ({ status, cuerpo: datos } = await destino.consultorio.manejar(opciones.method ?? 'GET', ruta, cuerpo));
+  }
+  if (status >= 400) {
     throw new Error(datos.error || 'No se pudo completar la acción.');
   }
   return datos;
