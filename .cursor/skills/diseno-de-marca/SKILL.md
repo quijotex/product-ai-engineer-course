@@ -5,69 +5,89 @@ description: Define la marca visual y el tono de la app del consultorio dental. 
 
 # Diseño de marca
 
-Aplica estas reglas al diseñar o modificar pantallas, color, tipografía o copy visible. La app es el mostrador de un consultorio dental pequeño: sobrio y clínico. El título de la app es "Consultorio". No inventes un nombre de producto.
+Aplica estas reglas al diseñar o modificar pantallas, color, tipografía o copy visible. La app es el mostrador de un consultorio dental pequeño. El título de la app es "Consultorio". No inventes un nombre de producto.
 
 ## Personalidad
 
-Orden, luz clara y pocos elementos. La lectora es la asistente, a quien ya conoce el consultorio. Las frases caben en una pantalla de trabajo, con el mismo tono de una nota dejada en el mostrador.
+Porcelana y agenda. Cálida como un consultorio de barrio, ordenada como una agenda de papel. La lectora es la asistente, a quien ya conoce el consultorio. Las frases caben en una pantalla de trabajo, con el mismo tono de una nota dejada en el mostrador.
 
 ## Paleta
 
-Color plano. Un solo verde clínico para la acción. Sin gradientes.
+Color plano. Marfil de fondo, tinta azul marino para el texto y terracota para la acción. Sin verde y sin gradientes.
 
 | Uso | Hex |
 | --- | --- |
-| Fondo de la app | `#F3F5F4` |
-| Superficie | `#FFFFFF` |
-| Texto principal | `#1A2421` |
-| Texto secundario | `#3E4A46` |
-| Línea | `#D5DEDA` |
-| Acción | `#1B5E57` |
-| Acción al presionar | `#144842` |
-| Texto sobre la acción | `#F4FAF8` |
-| Éxito | `#1E6B45` |
-| Aviso | `#8A5A12` |
-| Error | `#8C2F2F` |
-| Fondo de éxito | `#E6F3EC` |
-| Fondo de aviso | `#F6EBD9` |
-| Fondo de error | `#F8EAEA` |
+| Fondo de la app | `#F7F2EA` |
+| Superficie | `#FFFDF9` |
+| Texto principal (tinta) | `#1D2742` |
+| Texto secundario | `#5B6275` |
+| Línea | `#E6DDD0` |
+| Acción (terracota) | `#B8492E` |
+| Acción al presionar | `#9C3A22` |
+| Texto sobre la acción | `#FFFDF9` |
+| Confirmó: texto / fondo | `#2F4A8A` / `#E4E9F5` |
+| Canceló y error: texto / fondo | `#9C3A22` / `#F7E3DC` |
+| Aviso y sin respuesta: texto / fondo | `#7A5A0C` / `#F5EBCF` |
+| Neutro (programado): texto / fondo | `#5B6275` / `#EFEAE2` |
 
 ## Tipografía
 
-Una sola familia: IBM Plex Sans. Si no carga, la sans del sistema. Pesos 400 y 600, nada más.
+Tres voces, todas sin descargas. La app no carga fuentes de internet: si la fuente no está instalada en el equipo, usa el respaldo local.
 
-- Título de pantalla: 22px, peso 600.
-- Cuerpo: 16px, peso 400, interlineado 1.45.
-- Hora y estado en una fila: 14px, peso 400.
-- Radio de botones y filas: 4px.
+| Voz | Fuente | Respaldo local | Uso |
+| --- | --- | --- | --- |
+| Serif | Fraunces | Iowan Old Style, Palatino Linotype, Georgia | Título de pantalla, horas grandes, cifras del Resumen |
+| Sans | Instrument Sans | Segoe UI Variable Text, Avenir Next, system-ui | Cuerpo, nombres, botones |
+| Mono | JetBrains Mono | Cascadia Mono, Consolas, Menlo | Datos: hora de envío, modo mock, teléfono |
+
+- Título de pantalla: serif, 34px, peso 400.
+- Hora en el talón del tiquete: serif, 26px.
+- Nombre del paciente: sans, 17px, peso 600.
+- Datos de la fila: mono, 12px.
+- Cuerpo: sans, 16px, interlineado 1.45.
+- Etiqueta de marca arriba del título: sans, 12px, peso 600, espaciado 2px, en terracota.
+
+## Componentes
+
+- **Botón tecla.** Borde de 2px en tinta y borde inferior de 5px. Radio 8px. Al presionar, el borde inferior baja a 2px y el botón se hunde 3px.
+  - Principal: fondo terracota. Uno solo por pantalla.
+  - Secundario: fondo superficie, texto tinta.
+  - Terciario: fondo tinta, texto marfil, más pequeño.
+- **Enlace.** Terracota, subrayado con separación de 4px. Para acciones menores.
+- **Tiquete.** Una cita por tiquete. Talón a la izquierda con la hora en serif y el día en mono, separado por una línea punteada. Borde de 1.5px en tinta, radio 10px. Abierto, el borde pasa a terracota.
+- **Sello.** Píldora de 12px, peso 600, con los colores de estado.
+- **Pestañas y filtros.** Texto secundario, la activa en tinta con subrayado terracota de 2px.
+- **Burbujas.** El consultorio a la izquierda en superficie con borde; el paciente a la derecha en tinta.
 
 ## Tono de voz
 
-Español, trato de usted, frases cortas. El copy dice qué hay y qué puede hacer la asistente. Los estados se nombran así: Programado, Enviado, Omitido, Fallido.
+Español, trato de usted, frases cortas. El copy dice qué hay y qué puede hacer la asistente. Los estados se nombran así: Programado, Enviado, Omitido, Fallido. La confirmación: Sin respuesta, Confirmó, Canceló.
 
 ## Qué evitar
 
-- Gradiente morado, violeta, neón o cualquier degradado de color.
+- Verde, gradientes, morado, violeta o neón.
+- Fuentes cargadas desde internet.
 - Mascotas, emoji, signos de exclamación y fotos grandes de sonrisas.
 - Inglés en botones, títulos, listas o estados vacíos.
-- Sombras fuertes y esquinas muy redondeadas.
+- Sombras difusas. La profundidad la da el borde inferior de la tecla.
+- Más de un botón terracota por pantalla.
 - Un nombre de producto distinto de "Consultorio".
 
 ## Ejemplos
 
 ### Botones
 
-Sí: `Procesar pendientes`. Fondo `#1B5E57`, texto `#F4FAF8`, radio 4px.
+Sí: `Procesar pendientes`. Fondo `#B8492E`, texto `#FFFDF9`, borde `#1D2742` de 2px y 5px abajo.
 
 No: `¡Enviar magia ahora!` sobre un gradiente de `#7C3AED` a `#EC4899`.
 
 ### Listas
 
-Sí: una fila por recordatorio, en este orden.
+Sí: un tiquete por recordatorio.
 
 ```
-Ana Gómez
-Cita 15:00 · 24 h · Envío 15:00 · Enviado
+09:00 │ Luis Pérez                          Canceló
+jue 29│ 24 h · enviado hoy 09:00 · respondió hoy 10:12
 ```
 
 No: tarjeta con emoji de diente, anillo de progreso y el texto "Awesome, confirmed!".

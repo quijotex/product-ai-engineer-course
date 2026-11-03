@@ -5,13 +5,21 @@ import { fileURLToPath } from 'node:url';
 import { crearCalendario, crearWhatsapp } from './adapters.js';
 import { leerConfig } from './config.js';
 import {
+  aplicarRespuestas,
+  confirmacionDe,
+  conversaciones,
   dentroDeVentana,
   desdeBogota,
+  liberarEspacio,
   partesBogota,
   presentar,
   procesar,
+  responder,
+  resumen,
   sincronizar,
+  textoFecha,
   textoReloj,
+  textoRespuesta,
   textoResultado,
   valorDatetime,
   visibles,
@@ -49,8 +57,11 @@ export function createApp(opciones = {}) {
   });
 
   let recordatorios = [];
+  let respuestas = {};
   let horaDemo = null;
   let errorCalendario = null;
+  // En real no hay webhook para leer respuestas: no se piden ni se muestran.
+  const leeRespuestas = whatsapp.modo === 'mock';
 
   function ahora() {
     return horaDemo ?? ahoraReal();
@@ -60,7 +71,10 @@ export function createApp(opciones = {}) {
     try {
       const citas = await calendario.leer();
       errorCalendario = null;
-      recordatorios = sincronizar(citas, recordatorios);
+      recordatorios = aplicarRespuestas(
+        sincronizar(citas, recordatorios, { pedirRespuesta: leeRespuestas }),
+        respuestas,
+      );
     } catch {
       errorCalendario = 'No se pudo leer el calendario.';
     }
@@ -88,14 +102,50 @@ export function createApp(opciones = {}) {
     if (whatsapp.modo === 'real') await aplicarProceso();
   });
 
-  function cuerpoEstado(resultado) {
+  function responderAhora(cuerpo) {
+    if (!leeRespuestas) {
+      return { error: 'Las respuestas simuladas solo están disponibles con WhatsApp en mock.' };
+    }
+    if (typeof cuerpo?.eventoId !== 'string' || typeof cuerpo?.texto !== 'string') {
+      return { error: 'Falta la cita o la respuesta.' };
+    }
+    const salida = responder(recordatorios, respuestas, cuerpo, ahora());
+    if (salida.error) return salida;
+    recordatorios = salida.recordatorios;
+    respuestas = salida.respuestas;
+    return { aviso: textoRespuesta(salida) };
+  }
+
+  function liberarAhora(cuerpo) {
+    if (typeof cuerpo?.eventoId !== 'string') return { error: 'Falta la cita.' };
+    const salida = liberarEspacio(respuestas, cuerpo.eventoId);
+    if (salida.error) return salida;
+    respuestas = salida.respuestas;
+    return {};
+  }
+
+  function cuerpoEstado(resultado, avisoSimulador = null) {
     const momento = ahora();
-    const lista = visibles(recordatorios, momento).map((fila) => presentar(fila, momento));
+    const lista = visibles(recordatorios, momento).map((fila) => presentar(
+      fila,
+      momento,
+      leeRespuestas
+        ? {
+          confirmacion: confirmacionDe(fila.eventoId, recordatorios, respuestas),
+          respuesta: respuestas[fila.eventoId] ?? null,
+        }
+        : {},
+    ));
     return {
+      leeRespuestas,
+      conversaciones: leeRespuestas ? conversaciones(recordatorios, respuestas, momento) : [],
+      resumen: resumen(recordatorios, respuestas),
+      avisoSimulador,
       zona: 'America/Bogota',
       ahora: momento.toISOString(),
       ahoraCampo: valorDatetime(momento),
       hora: textoReloj(momento),
+      fecha: textoFecha(momento),
       horaDemo: Boolean(horaDemo),
       calendar: calendario.modo,
       whatsapp: whatsapp.modo,
@@ -165,6 +215,26 @@ export function createApp(opciones = {}) {
     if (req.method === 'POST' && pathname === '/api/procesar') {
       const resultado = await encolar(aplicarProceso);
       enviarJson(res, 200, cuerpoEstado(resultado));
+      return;
+    }
+    if (req.method === 'POST' && pathname === '/api/responder') {
+      const cuerpo = await leerJson(req);
+      const salida = await encolar(async () => responderAhora(cuerpo));
+      if (salida.error) {
+        enviarJson(res, 400, { error: salida.error });
+        return;
+      }
+      enviarJson(res, 200, cuerpoEstado(null, salida.aviso));
+      return;
+    }
+    if (req.method === 'POST' && pathname === '/api/espacio') {
+      const cuerpo = await leerJson(req);
+      const salida = await encolar(async () => liberarAhora(cuerpo));
+      if (salida.error) {
+        enviarJson(res, 400, { error: salida.error });
+        return;
+      }
+      enviarJson(res, 200, cuerpoEstado(null));
       return;
     }
     if (req.method === 'POST' && pathname === '/api/hora') {

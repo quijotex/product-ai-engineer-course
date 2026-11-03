@@ -42,7 +42,7 @@ El paciente solo recibe WhatsApp. No hay correo, SMS ni otra app.
 - Un solo intento. No hay reintentos automáticos.
 - Todas las horas, en la lista y en el mensaje, van en 24 horas.
 - Texto del mensaje, sin emoji y de usted: `Consultorio de la Dra. Laura. Le recordamos su cita el {día de la semana} {día} de {mes} a las {HH:MM}.` Ejemplo: `Consultorio de la Dra. Laura. Le recordamos su cita el martes 3 de noviembre a las 15:00.`
-- No hay link de confirmación ni lectura de respuestas. El mensaje solo informa.
+- No hay link de confirmación. La lectura de respuestas y la línea `Responda 1 para confirmar o 2 para cancelar.` se definen en `docs/spec-confirmacion-asistencia.md`, que cambia esta regla.
 
 ### Sin duplicados
 
@@ -77,7 +77,7 @@ Citas fijas para la demo, con la zona America/Bogota:
 
 ### Qué ve la asistente
 
-Una pantalla, título "Recordatorios". Lista del día en curso, ordenada por hora de envío. Cada fila muestra paciente, hora de la cita, tipo (24 h o 2 h), hora de envío y estado. Al abrir la fila se ve el texto exacto del mensaje.
+Una pantalla, título "Recordatorios". `docs/spec-confirmacion-asistencia.md` le suma Conversaciones y Resumen. Lista del día en curso, ordenada por hora de envío. Cada fila muestra paciente, hora de la cita, tipo (24 h o 2 h), hora de envío y estado. Al abrir la fila se ve el texto exacto del mensaje.
 
 En mock hay una acción, "Procesar pendientes". Entrega solo los que están en `programado`, cuya hora de envío ya pasó y cuya cita aún no empieza, y solo si la hora actual está entre las 08:00 y las 20:00. No escribe mensajes y no llama a WhatsApp real.
 

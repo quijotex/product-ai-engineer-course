@@ -11,6 +11,17 @@ const MESES_CORTOS = [
   'ene', 'feb', 'mar', 'abr', 'may', 'jun',
   'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
 ];
+const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+
+const LINEA_RESPUESTA = 'Responda 1 para confirmar o 2 para cancelar.';
+const MOTIVO_CANCELO = 'El paciente canceló por WhatsApp.';
+// Estimado del spec de confirmación: abrir el chat, copiar, revisar y enviar.
+const MINUTOS_POR_MENSAJE = 2;
+const TEXTO_CONFIRMACION = {
+  sin_respuesta: 'Sin respuesta',
+  confirmo: 'Confirmó',
+  cancelo: 'Canceló',
+};
 
 export function partesBogota(fecha) {
   const shifted = new Date(fecha.getTime() - OFFSET_BOGOTA_MS);
@@ -69,13 +80,15 @@ export function leerTelefono(descripcion) {
   return null;
 }
 
-export function textoRecordatorio(inicio) {
+export function textoRecordatorio(inicio, { pedirRespuesta = false } = {}) {
   const partes = partesBogota(inicio);
   const hora = hhmm(inicio);
-  return `Consultorio de la Dra. Laura. Le recordamos su cita el ${DIAS[partes.weekday]} ${partes.day} de ${MESES[partes.month]} a las ${hora}.`;
+  const base = `Consultorio de la Dra. Laura. Le recordamos su cita el ${DIAS[partes.weekday]} ${partes.day} de ${MESES[partes.month]} a las ${hora}.`;
+  return pedirRespuesta ? `${base} ${LINEA_RESPUESTA}` : base;
 }
 
-export function sincronizar(citas, anteriores) {
+// pedirRespuesta solo es true cuando la app puede leer respuestas (WhatsApp en mock).
+export function sincronizar(citas, anteriores, { pedirRespuesta = false } = {}) {
   const porClave = new Map(anteriores.map((fila) => [fila.clave, { ...fila }]));
   const ids = new Set(citas.map((cita) => cita.id));
 
@@ -92,7 +105,7 @@ export function sincronizar(citas, anteriores) {
         continue;
       }
 
-      porClave.set(clave, filaDesdeCita(cita, tipo));
+      porClave.set(clave, filaDesdeCita(cita, tipo, pedirRespuesta));
     }
   }
 
@@ -105,7 +118,7 @@ export function sincronizar(citas, anteriores) {
   return [...porClave.values()];
 }
 
-function filaDesdeCita(cita, tipo) {
+function filaDesdeCita(cita, tipo, pedirRespuesta) {
   const horas = tipo === '24h' ? 24 : 2;
   const inicio = cita.inicio instanceof Date ? cita.inicio : new Date(cita.inicio);
   const horaEnvio = horaDeEnvio(inicio, horas);
@@ -121,7 +134,7 @@ function filaDesdeCita(cita, tipo) {
     estado = 'omitido';
     motivo = 'Sin hora de envío dentro de la ventana.';
   } else {
-    mensaje = textoRecordatorio(inicio);
+    mensaje = textoRecordatorio(inicio, { pedirRespuesta });
   }
 
   return {
@@ -161,6 +174,7 @@ export async function procesar(recordatorios, ahora, enviar) {
       if (resultado?.ok) {
         fila.estado = 'enviado';
         fila.motivo = null;
+        fila.enviadoEn = ahora;
         resumen.enviados += 1;
       } else {
         fila.estado = 'fallido';
@@ -193,15 +207,32 @@ export function visibles(recordatorios, ahora) {
     });
 }
 
-export function presentar(fila, ahora) {
+export function presentar(fila, ahora, { confirmacion = null, respuesta = null } = {}) {
   const estadoTexto = fila.estado.charAt(0).toUpperCase() + fila.estado.slice(1);
   const citaTexto = `Cita ${cuando(fila.inicio, ahora)} ${hhmm(fila.inicio)}`;
   const tipoTexto = fila.tipo === '24h' ? '24 h' : '2 h';
   const envioTexto = fila.horaEnvio
     ? `Envío ${cuando(fila.horaEnvio, ahora)} ${hhmm(fila.horaEnvio)}`
     : 'Sin hora de envío';
+  const ultima = respuesta?.historial?.at(-1) ?? null;
+
+  let datoTexto;
+  if (fila.estado === 'enviado') {
+    const enviado = fila.enviadoEn ?? fila.horaEnvio;
+    datoTexto = `${tipoTexto} · enviado ${cuando(enviado, ahora)} ${hhmm(enviado)}`;
+    if (ultima) datoTexto += ` · respondió ${cuando(ultima.hora, ahora)} ${hhmm(ultima.hora)}`;
+  } else if (fila.estado === 'programado') {
+    datoTexto = `${tipoTexto} · ${envioTexto.toLowerCase()}`;
+  } else {
+    datoTexto = `${tipoTexto} · ${sinPunto(fila.motivo ?? estadoTexto).toLowerCase()}`;
+  }
+
+  // El sello muestra la confirmación en las filas enviadas; en las demás, el estado.
+  const conSello = fila.estado === 'enviado' && confirmacion;
+  const inicioPartes = partesBogota(fila.inicio);
   return {
     clave: fila.clave,
+    eventoId: fila.eventoId,
     paciente: fila.paciente,
     tipo: fila.tipo,
     estado: fila.estado,
@@ -212,7 +243,171 @@ export function presentar(fila, ahora) {
     envioTexto,
     estadoTexto,
     linea: `${citaTexto} · ${tipoTexto} · ${envioTexto} · ${estadoTexto}`,
+    horaCita: hhmm(fila.inicio),
+    diaCita: `${DIAS_CORTOS[inicioPartes.weekday]} ${inicioPartes.day}`,
+    inicioTexto: `${cuando(fila.inicio, ahora)} a las ${hhmm(fila.inicio)}`,
+    datoTexto,
+    confirmacion,
+    confirmacionTexto: confirmacion ? TEXTO_CONFIRMACION[confirmacion] : null,
+    sello: conSello ? confirmacion : fila.estado,
+    selloTexto: conSello ? TEXTO_CONFIRMACION[confirmacion] : estadoTexto,
+    respuestaTexto: ultima?.texto ?? null,
+    respuestaHora: ultima ? `${cuando(ultima.hora, ahora)} ${hhmm(ultima.hora)}` : null,
+    respuestaReconocida: ultima ? Boolean(ultima.valor) : null,
+    espacioLiberado: Boolean(respuesta?.espacioLiberado),
   };
+}
+
+export function interpretarRespuesta(texto) {
+  const limpio = String(texto ?? '').trim();
+  if (limpio === '1') return 'confirmo';
+  if (limpio === '2') return 'cancelo';
+  return null;
+}
+
+// respuestas: { [eventoId]: { valor, historial: [{ texto, hora, valor }], espacioLiberado } }
+export function responder(recordatorios, respuestas, { eventoId, texto }, ahora) {
+  const filas = recordatorios.filter((fila) => fila.eventoId === eventoId);
+  if (!filas.some((fila) => fila.estado === 'enviado')) {
+    return { error: 'Esta cita no tiene un recordatorio enviado.' };
+  }
+  if (filas[0].inicio.getTime() <= ahora.getTime()) {
+    return { error: 'La cita ya empezó.' };
+  }
+  const limpio = String(texto ?? '').trim();
+  if (!limpio) return { error: 'Escriba una respuesta.' };
+
+  const previa = respuestas[eventoId] ?? { valor: null, historial: [], espacioLiberado: false };
+  const valor = interpretarRespuesta(limpio);
+  const registro = {
+    ...previa,
+    historial: [...previa.historial, { texto: limpio, hora: ahora, valor }],
+  };
+
+  let efecto;
+  if (!valor) efecto = 'no_reconocida';
+  else if (previa.valor === 'cancelo') efecto = 'ya_cancelada';
+  else {
+    registro.valor = valor;
+    efecto = valor;
+  }
+
+  const nuevas = { ...respuestas, [eventoId]: registro };
+  return {
+    recordatorios: aplicarRespuestas(recordatorios, nuevas),
+    respuestas: nuevas,
+    efecto,
+    paciente: filas[0].paciente,
+  };
+}
+
+// Una cita cancelada no recibe más recordatorios. Se aplica también después de sincronizar.
+export function aplicarRespuestas(recordatorios, respuestas) {
+  return recordatorios.map((fila) => (
+    fila.estado === 'programado' && respuestas[fila.eventoId]?.valor === 'cancelo'
+      ? { ...fila, estado: 'omitido', motivo: MOTIVO_CANCELO }
+      : fila
+  ));
+}
+
+export function confirmacionDe(eventoId, recordatorios, respuestas) {
+  const enviado = recordatorios.some((fila) => fila.eventoId === eventoId && fila.estado === 'enviado');
+  if (!enviado) return null;
+  return respuestas[eventoId]?.valor ?? 'sin_respuesta';
+}
+
+export function liberarEspacio(respuestas, eventoId) {
+  if (respuestas[eventoId]?.valor !== 'cancelo') {
+    return { error: 'Solo se libera el espacio de una cita cancelada.' };
+  }
+  return {
+    respuestas: { ...respuestas, [eventoId]: { ...respuestas[eventoId], espacioLiberado: true } },
+  };
+}
+
+export function textoRespuesta({ efecto, paciente }) {
+  if (efecto === 'confirmo') return `${paciente} confirmó su cita.`;
+  if (efecto === 'cancelo') return `${paciente} canceló su cita. El recordatorio pendiente quedó omitido.`;
+  if (efecto === 'ya_cancelada') return 'La cita ya estaba cancelada. La respuesta quedó registrada.';
+  return 'No se reconoce la respuesta. Solo valen 1 o 2. La cita sigue igual.';
+}
+
+export function conversaciones(recordatorios, respuestas, ahora) {
+  const porEvento = new Map();
+  for (const fila of recordatorios) {
+    if (fila.estado !== 'enviado') continue;
+    if (!porEvento.has(fila.eventoId)) {
+      porEvento.set(fila.eventoId, { fila, mensajes: [] });
+    }
+    const enviado = fila.enviadoEn ?? fila.horaEnvio;
+    porEvento.get(fila.eventoId).mensajes.push({ de: 'consultorio', texto: fila.mensaje, hora: enviado });
+  }
+
+  return [...porEvento.entries()]
+    .map(([eventoId, { fila, mensajes }]) => {
+      const respuesta = respuestas[eventoId];
+      for (const item of respuesta?.historial ?? []) {
+        mensajes.push({ de: 'paciente', texto: item.texto, hora: item.hora, reconocida: Boolean(item.valor) });
+      }
+      mensajes.sort((a, b) => a.hora.getTime() - b.hora.getTime());
+      const confirmacion = respuesta?.valor ?? 'sin_respuesta';
+      return {
+        eventoId,
+        paciente: fila.paciente,
+        telefono: fila.telefono,
+        inicio: fila.inicio,
+        citaTexto: `Cita ${cuando(fila.inicio, ahora)} ${hhmm(fila.inicio)}`,
+        abierta: fila.inicio.getTime() > ahora.getTime(),
+        confirmacion,
+        confirmacionTexto: TEXTO_CONFIRMACION[confirmacion],
+        hilo: mensajes.map((item) => ({
+          de: item.de,
+          texto: item.texto,
+          hora: `${cuando(item.hora, ahora)} ${hhmm(item.hora)}`,
+          reconocida: item.reconocida ?? null,
+        })),
+      };
+    })
+    .sort((a, b) => a.inicio.getTime() - b.inicio.getTime())
+    .map(({ inicio, ...resto }) => resto);
+}
+
+export function resumen(recordatorios, respuestas) {
+  const enviados = recordatorios.filter((fila) => fila.estado === 'enviado');
+  const eventos = new Set(enviados.map((fila) => fila.eventoId));
+  let confirmadas = 0;
+  let canceladas = 0;
+  let espaciosLiberados = 0;
+  for (const id of eventos) {
+    const respuesta = respuestas[id];
+    if (respuesta?.valor === 'confirmo') confirmadas += 1;
+    if (respuesta?.valor === 'cancelo') canceladas += 1;
+    if (respuesta?.espacioLiberado) espaciosLiberados += 1;
+  }
+  const citas = eventos.size;
+  const porcentaje = (n) => (citas ? Math.round((n * 100) / citas) : 0);
+  return {
+    citas,
+    confirmadas,
+    canceladas,
+    sinRespuesta: citas - confirmadas - canceladas,
+    tasaRespuesta: porcentaje(confirmadas + canceladas),
+    tasaConfirmacion: porcentaje(confirmadas),
+    tasaCancelacion: porcentaje(canceladas),
+    espaciosLiberados,
+    mensajes: enviados.length,
+    minutosAhorrados: enviados.length * MINUTOS_POR_MENSAJE,
+  };
+}
+
+function sinPunto(texto) {
+  return String(texto).replace(/\.$/, '');
+}
+
+export function textoFecha(fecha) {
+  const partes = partesBogota(fecha);
+  const dia = DIAS[partes.weekday];
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${partes.day} de ${MESES[partes.month]} · ${hhmm(fecha)}`;
 }
 
 export function textoReloj(fecha) {
