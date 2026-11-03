@@ -39,6 +39,8 @@ let seleccionado = null;
 // El servidor atiende en orden; si una respuesta llega tarde, no pisa a una más nueva.
 let ultimaPedida = 0;
 let ultimaPintada = 0;
+// Servidor o núcleo local; se decide en la primera petición (ver obtenerBackend).
+let backend = null;
 
 demo.addEventListener('submit', (evento) => evento.preventDefault());
 cambiarHora.addEventListener('click', () => {
@@ -129,8 +131,6 @@ async function responder(texto) {
 
 // Con `node server.js` la pantalla habla con /api/. En un hosting estático (Netlify)
 // no hay /api/, así que corre el mismo núcleo dentro del navegador.
-let backend = null;
-
 function obtenerBackend() {
   backend ??= (async () => {
     try {
@@ -142,7 +142,12 @@ function obtenerBackend() {
       // Sin servidor: sigue con el núcleo local.
     }
     const { crearConsultorio } = await import('./lib/consultorio.js');
-    return { remoto: false, consultorio: crearConsultorio() };
+    const consultorio = crearConsultorio();
+    // La demo publicada arranca en marcha: hoy a las 16:00, con los recordatorios de 24 h
+    // ya enviados, para que Conversaciones tenga pacientes a cualquier hora del día.
+    await consultorio.manejar('POST', '/api/hora', { preset: 'hoy-16:00' });
+    await consultorio.manejar('POST', '/api/procesar', {});
+    return { remoto: false, consultorio };
   })();
   return backend;
 }

@@ -16,6 +16,8 @@ Abrir http://127.0.0.1:3000.
 
 La app también corre completa en el navegador, sin servidor: si la pantalla no encuentra `/api/`, usa el mismo núcleo (`src/consultorio.js`) dentro de la pestaña. El estado vive en la pestaña y se reinicia al recargar.
 
+La versión publicada arranca en marcha: hoy a las 16:00, con los recordatorios de 24 h de Ana y Luis ya enviados, para que Conversaciones tenga pacientes a cualquier hora. Así se puede saltar el paso 1 de la demo. "Cambiar hora" sigue disponible.
+
 `netlify.toml` ya trae la configuración: build `node scripts/build.js` y publicación de `dist/`. En la pantalla de Netlify se dejan vacíos los campos de build. Para probar el build en local:
 
 ```bash
